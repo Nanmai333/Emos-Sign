@@ -1,12 +1,12 @@
 /**
  * emos 整合脚本 (Egern 专用)
- * 1. 捕获 Token 并发送成功/重复通知 (源自: emos获取参数.js)
- * 2. 自动化签到并展示修仙境界 (源自: emos签到.js)
+ * 功能：1. 自动捕获 Token (带成功/重复通知)
+ * 2. 自动化修仙签到 (境界显示)
  */
 
 var key = "emos_best_token";
 
-// ================= 1. 获取参数逻辑 (HTTP Request 触发) =================
+// ================= 1. 获取参数逻辑 (Rewrite 模式) =================
 if (typeof $request !== "undefined" && $request) {
     var headers = $request.headers;
     if (headers) {
@@ -14,15 +14,14 @@ if (typeof $request !== "undefined" && $request) {
         if (auth && auth.indexOf("Bearer") !== -1) {
             var newToken = auth.trim();
             try {
-                // 读取旧 Token 进行对比
                 var oldToken = $persistentStore.read(key);
                 
+                // 严格执行您提供的逻辑：Token 不同或不存在则更新，相同则提醒
                 if (!oldToken || oldToken !== newToken) {
                     $persistentStore.write(newToken, key);
-                    // 弹出成功通知
                     $notification.post("emos 签到", "✅ 新 Token 获取成功", "凭证已更新，开始修仙！");
                 } else {
-                    // 弹出重复通知
+                    // 确保重复时也弹出通知，方便排查脚本是否生效
                     $notification.post("emos 签到", "ℹ️ 重复 Token 提醒", "凭证一致，无需重复操作。");
                 }
             } catch (e) {
@@ -33,9 +32,9 @@ if (typeof $request !== "undefined" && $request) {
     $done({});
 } 
 
-// ================= 2. 自动化签到逻辑 (Cron 触发) =================
+// ================= 2. 自动化签到逻辑 (Cron 模式) =================
 else {
-    // 修仙境界体系
+    // 修仙境界定义
     var levels = [
         { n: "👤凡人期", max: 9 }, { n: "💨练气期·一层", max: 19 }, { n: "💨练气期·二层", max: 29 },
         { n: "💨练气期·三层", max: 39 }, { n: "💨练气期·四层", max: 49 }, { n: "💨练气期·五层", max: 59 },
@@ -48,19 +47,18 @@ else {
         { n: "🔗合体期", max: 9999999 }, { n: "🌟大乘期", max: 99999999 }, { n: "👑真仙期", max: Infinity }
     ];
 
-    function getCultivationInfo(carrot) {
+    function getLv(carrot) {
         var min = 0;
         for (var i = 0; i < levels.length; i++) {
             var max = levels[i].max;
             if (carrot <= max) {
-                var nextNeed = max === Infinity ? 0 : max - carrot + 1;
                 var ratio = max === Infinity ? 1 : (carrot - min) / (max - min + 1);
                 var bar = "■".repeat(Math.floor(ratio * 10)).padEnd(10, "□");
-                return { name: levels[i].n, bar: bar, percent: (ratio * 100).toFixed(1), nextNeed: nextNeed };
+                return { n: levels[i].n, bar: bar, per: (ratio * 100).toFixed(1) };
             }
             min = max + 1;
         }
-        return { name: "未知", bar: "□□□□□□□□□□", percent: "0.0", nextNeed: 0 };
+        return { n: "未知", bar: "□□□□□□□□□□", per: "0.0" };
     }
 
     var savedToken = $persistentStore.read(key);
@@ -68,32 +66,26 @@ else {
         $notification.post("emos 签到", "❌ 失败", "未找到 Token，请先登录网页触发获取");
         $done();
     } else {
-        var headers = {
-            "Authorization": savedToken,
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0"
-        };
-
+        var headers = { "Authorization": savedToken, "Content-Type": "application/json" };
+        
+        // 先获取当前修为状态
         $httpClient.get({ url: "https://emos.best/api/user", headers: headers }, function(err, resp, data) {
             if (err) { $done(); return; }
             try {
                 var uObj = JSON.parse(data);
                 var today = new Date().toISOString().substring(0, 10);
                 var isSigned = (uObj.sign && uObj.sign.sign_at && uObj.sign.sign_at.indexOf(today) !== -1);
-
+                
                 if (isSigned) {
-                    var lv = getCultivationInfo(uObj.carrot);
-                    var msg = "👨‍🌾 重复修仙 明天再修💪\n" + "修为: [" + lv.name + "] " + uObj.carrot + " 🥕";
-                    $notification.post("emos 签到", "✨ 仙途长青", msg);
+                    var lv = getLv(uObj.carrot);
+                    $notification.post("emos 签到", "✨ 仙途长青", "境界: [" + lv.n + "]\n修为: " + uObj.carrot + " 🥕\n进度: [" + lv.bar + "] " + lv.per + "%");
                     $done();
                 } else {
-                    $httpClient.put({
-                        url: "https://emos.best/api/user/sign?content=" + encodeURIComponent("滴滴打卡"),
-                        headers: headers
-                    }, function(sErr, sResp, sData) {
-                        var resObj = JSON.parse(sData);
-                        var lvNow = getCultivationInfo(uObj.carrot + (resObj.earn_point || 0));
-                        $notification.post("emos 签到", "✅ 突破成功", "获得: +" + resObj.earn_point + " 🥕\n境界: " + lvNow.name);
+                    // 执行签到
+                    $httpClient.put({ url: "https://emos.best/api/user/sign?content=" + encodeURIComponent("滴滴打卡"), headers: headers }, function(sErr, sResp, sData) {
+                        var res = JSON.parse(sData);
+                        var lvNow = getLv(uObj.carrot + (res.earn_point || 0));
+                        $notification.post("emos 签到", "✅ 突破成功", "获得: +" + (res.earn_point || 0) + " 🥕\n当前境界: " + lvNow.n);
                         $done();
                     });
                 }
