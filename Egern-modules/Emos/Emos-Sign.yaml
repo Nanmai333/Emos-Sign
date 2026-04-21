@@ -40,12 +40,12 @@ scriptings:
   - http_request:
       name: "Emos 账号抓取"
       match: "^https://emos\\.best/api/user"
-      script_url: "https://raw.githubusercontent.com/Nanmai333/Emos-Sign/refs/heads/main/emos.js"
+      script_url: "https://raw.githubusercontent.com/Nanmai333/Simple-project/refs/heads/main/Egern-modules/Emos/emos.js"
       timeout: 10
 
   - schedule:
       name: "Emos 每日修仙任务"
-      cron: "0 05 19 * * ?"
-      script_url: "https://raw.githubusercontent.com/Nanmai333/Emos-Sign/refs/heads/main/emos.js"
+      cron: "0 20 19 * * ?"
+      script_url: "https://raw.githubusercontent.com/Nanmai333/Simple-project/refs/heads/main/Egern-modules/Emos/emos.js"
       timeout: 120
       
