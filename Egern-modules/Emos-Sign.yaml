@@ -51,9 +51,7 @@ scriptings:
 
   - schedule:
       name: "Emos 每日修仙任务"
-      # 正确的动态引用方式：使用 ${{ }} 或从环境变量中映射
-      # 注意：在 Egern UI 修改此值后，需要重启模块以重新注册定时器
-      cron: "${{SIGN_CRON}}"
+      cron: "${env:SIGN_CRON}"
       script_url: "https://raw.githubusercontent.com/Nanmai333/Emos-Sign/refs/heads/main/emos.js"
       timeout: 120
       
