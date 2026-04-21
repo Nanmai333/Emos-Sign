@@ -45,7 +45,7 @@ scriptings:
 
   - schedule:
       name: "Emos 每日修仙任务"
-      cron: "0 20 19 * * ?"
+      cron: "0 30 19 * * ?"
       script_url: "https://raw.githubusercontent.com/Nanmai333/Simple-project/refs/heads/main/Egern-modules/Emos/emos.js"
       timeout: 120
       
